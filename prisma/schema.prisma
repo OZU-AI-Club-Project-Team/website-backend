@@ -1,0 +1,249 @@
+generator client {
+  provider = "prisma-client-py" //-py important!!
+  //output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  MEMBER
+  ADMIN
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  role          UserRole  @default(STUDENT)
+  key           String
+  name          String?
+  surname       String?
+  studentNumber String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  teamMember                TeamMember?
+  applications              Application[]
+  ideas                     Idea[]
+  memberships               ProjectMember[]
+  leadedProjects            Project[]
+  givenApplicationFeedbacks ApplicationFeedback[]
+
+  //refreshtokenlerin userla bağlantısı
+  refreshTokens             RefreshToken[]
+}
+
+//refresh modeli ben koydum
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+}
+
+enum CodeType {
+  VERIFICATION
+  RESET_KEY
+}
+
+model Code {
+  id         Int      @id @default(autoincrement())
+  email      String
+  hashedCode String
+  type       CodeType
+  attempts   Int      @default(0)
+  expiry     DateTime
+  used       Boolean @default(false) //used alanı
+  createdAt  DateTime @default(now())
+}
+
+enum WorkArea {
+  FRONTEND
+  BACKEND
+  DESIGN
+  MOBILE
+  MANAGEMENT
+}
+
+model TeamMember {
+  id            Int        @id
+  workAreas     WorkArea[]
+  photoURL      String?
+  bio           String
+  github        String?
+  linkedin      String?
+  extraLinks    String[]
+  applicationId Int?       @unique
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  user                       User                       @relation(fields: [id], references: [id], onDelete: Cascade)
+  application                TeamMemberApplication?     @relation(fields: [applicationId], references: [id])
+  givenPresentationFeedbacks IdeaPresentationFeedback[]
+}
+
+enum ApplicationStatus {
+  PENDING
+  CONTACTED
+  ACCEPTED
+  REJECTED
+}
+
+enum ApplicationType {
+  IDEA
+  TEAM_MEMBER
+}
+
+model Application {
+  id        Int               @id @default(autoincrement())
+  ownerId   Int
+  type      ApplicationType
+  status    ApplicationStatus @default(PENDING)
+  isRead    Boolean           @default(false)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  deletedAt DateTime?
+
+  owner                 User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  feedback              ApplicationFeedback?
+  ideaApplication       IdeaApplication?
+  teamMemberApplication TeamMemberApplication?
+}
+
+model ApplicationFeedback {
+  id            Int     @id @default(autoincrement())
+  applicationId Int     @unique
+  content       String
+  accepted      Boolean
+  userId        Int
+
+  createdAt DateTime @default(now())
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+}
+
+model IdeaApplication {
+  id          Int    @id
+  title       String
+  description String
+
+  idea        Idea?
+  application Application @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+model TeamMemberApplication {
+  id           Int        @id
+  workAreas    WorkArea[]
+  bio          String
+  expectations String
+  portfolioURL String?
+
+  teamMember  TeamMember?
+  application Application @relation(fields: [id], references: [id], onDelete: Cascade)
+}
+
+enum IdeaStatus {
+  DRAFT
+  PRESENTED
+  ACCEPTED
+  REJECTED
+}
+
+model Idea {
+  id            Int        @id @default(autoincrement())
+  applicationId Int?       @unique
+  owners        User[]
+  title         String
+  description   String
+  status        IdeaStatus @default(DRAFT)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
+
+  application   IdeaApplication?   @relation(fields: [applicationId], references: [id])
+  presentations IdeaPresentation[]
+  project       Project?
+}
+
+model IdeaPresentation {
+  id        Int       @id @default(autoincrement())
+  ideaId    Int
+  date      DateTime
+  location  String
+  summary   String
+  done      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  idea      Idea                       @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  feedbacks IdeaPresentationFeedback[]
+}
+
+model IdeaPresentationFeedback {
+  id             Int       @id @default(autoincrement())
+  presentationId Int
+  userId         Int
+  content        String
+  createdAt      DateTime  @default(now())
+  deletedAt      DateTime?
+
+  presentation IdeaPresentation @relation(fields: [presentationId], references: [id], onDelete: Cascade)
+  user         TeamMember       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ProjectStatus {
+  ONGOING
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+model Project {
+  id          Int           @id @default(autoincrement())
+  ideaId      Int?          @unique
+  title       String
+  description String
+  status      ProjectStatus @default(ONGOING)
+  public      Boolean       @default(false)
+  showcase    Boolean       @default(false)
+  leaderId    Int
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+
+  leader  User            @relation(fields: [leaderId], references: [id], onDelete: Cascade)
+  idea    Idea?           @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  members ProjectMember[]
+}
+
+enum WorkRole {
+  BACKEND_DEVELOPER
+  FRONTEND_DEVELOPER
+  MOBILE_DEVELOPER
+  DESIGNER
+  PROJECT_MANAGER
+  SUPERVISOR
+  IDEATOR
+}
+
+model ProjectMember {
+  id        Int        @id @default(autoincrement())
+  projectId Int
+  userId    Int
+  roles     WorkRole[]
+  joinedAt  DateTime   @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+}
