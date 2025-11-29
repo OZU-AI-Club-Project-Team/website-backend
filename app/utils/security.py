@@ -1,7 +1,10 @@
 import os
 from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Depends
+from fastapi.security import OAuth2PasswordBearer
+
+from app.db import db
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "a746b717be9fab1fa6ed250c50fb4eff788ac10b641755900166ddc1c707b2fc")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -40,6 +43,26 @@ def verify_access_token(token: str):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
         )
+
+#Urlsinden tokeni aldık
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/signin")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    #1.token'den user_id'yi çıkar
+    user_id = verify_access_token(token)
+
+    #2.DB'de kullanıcı var mı kontrol et
+    user = await db.user.find_unique(
+        where={"id": int(user_id)}
+    )
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
+
+    return user
 
 
 

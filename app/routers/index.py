@@ -1,0 +1,75 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+# Routerlar
+from app.modules.auth.auth_router import router as authRouter
+from app.modules.user.user_router import router as userRouter
+
+
+def setup_app(app: FastAPI) -> None:
+    """
+    Tüm middleware ve router'ları FastAPI app'ine bağlayan fonksiyon.
+    main.py tarafında sadece bu fonksiyon çağrılacak.
+    """
+
+    # ========= MIDDLEWARE =========
+    @app.middleware("http")
+    async def simple_logging_middleware(request: Request, call_next):
+        # Buraya:
+        # - request loglama
+        # - custom header ekleme
+        # - language / tenant vs. çıkarma
+        # gibi işler konulacak
+        response = await call_next(request)
+
+        # ~~SECURITY HEADERS~~
+
+         # 1) Temel güvenlik header'ları
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"  # clickjacking'e karşı
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # 2) HSTS / Lokal geliştirmede sorun çıkarsa kaldırılabilir
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains; preload"
+        )
+
+        # 3) Permissions-Policy (Feature-Policy)
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), "
+            "microphone=(), "
+            "camera=(), "
+            "payment=(), "
+            "fullscreen=(self)"
+            # Tarayıcı API'larını, özellikle mobil/browser'da kısıtlıyoruz.
+            # fullscreen sadece kendi siten için açık
+            # =() şeklindeki izinler yasak. Mesela mikrofon kullanılmayacak.
+        )
+
+        # 4) İzolasyon (COOP / COEP / CORP)
+        # Frontend ile uyumlu hale getirilecek
+
+        """
+        response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+        response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
+        response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+        """
+        
+        # 5) Content Security Policy (CSP)
+        # PROJEYE göre özelleştirilecek
+        
+        #response.headers["Content-Security-Policy"] = CSP_POLICY
+        return response
+
+    # Buraya global exception handler da eklenebilir
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        # prod’da burada loglama yapılacak
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"},
+        )
+
+    # ========= ROUTERLAR =========
+    app.include_router(authRouter)
+    app.include_router(userRouter)

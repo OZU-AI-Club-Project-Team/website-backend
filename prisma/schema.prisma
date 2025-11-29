@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-py" //-py important!!
+  provider = "prisma-client-py" //-py önemli!!
   //output   = "../src/generated/prisma"
 }
 
