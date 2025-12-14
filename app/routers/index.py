@@ -20,9 +20,21 @@ def setup_app(app: FastAPI) -> None:
         # - custom header ekleme
         # - language / tenant vs. çıkarma
         # gibi işler konulacak
-        response = await call_next(request)
+
+
+        #Cookie'deki access_token bearer header'na çevrildi
+        access_token = request.cookies.get("access_token")
+
+        if access_token:
+            headers = list(request.scope.get("headers") or [])
+            has_auth = any(k.lower() == b"authorization" for k, _ in headers)
+            if not has_auth:
+                headers.append((b"authorization", f"Bearer {access_token}".encode()))
+                request.scope["headers"] = headers
 
         # ~~SECURITY HEADERS~~
+
+        response = await call_next(request)
 
          # 1) Temel güvenlik header'ları
         response.headers["X-Content-Type-Options"] = "nosniff"

@@ -11,19 +11,30 @@ from prisma.enums import CodeType
 from app.db import db
 from app.utils.security import (
     create_access_token,
+    create_refresh_token,
+    verify_refresh_token,
     ACCESS_TOKEN_EXPIRE_MINUTES,
     REFRESH_TOKEN_EXPIRE_DAYS,
 )
 
 from app.modules.auth.auth_schema import (
     SendCodeRequest,
+    SendCodeResponse,
     SignInRequest,
-    TokenResponse,
+    SignInResponse,
     #RefreshRequest,
+    RefreshResponse,
+    ResetKeyRequest,
+    ResetKeyResponse,
 )
+from app.modules.user.user_schema import UserRole
 
 CODE_TTL_MINUTES = 3
+ACCESS_COOKIE_NAME = "access_token"
+SESSION_COOKIE_NAME = "session_id"
 
+
+# ~~HELPERS~~ gerekirse utilse koyulabilir
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
@@ -38,93 +49,62 @@ def _hash_code(code: str) -> str:
     # kodu hashle
     return hashlib.sha256(code.encode()).hexdigest()
 
+def _set_access_cookie(response: Response, token: str) -> None:
+    response.set.cookie(
+        key=ACCESS_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=int(ACCESS_TOKEN_EXPIRE_MINUTES) * 60,
+        path="/",
+    )
+
+def _set_session_cookie(response: Respose, session_id: str) -> None:
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=int(REFRESH_TOKEN_EXPIRE_DAYS)*24*60*60,
+        path="/",
+    )
+
+def _clear_cookie(response: Response, name: str) -> None:
+    response.delete_cookie(key=name, path="/")
+
+def _new_session_id() -> str:
+    return secrets.token_urlsafe(48)
+
+
+
 
 # ========== PUBLIC CONTROLLER FONKSİYONLARI ==========
 
-async def send_code(payload: SendCodeRequest) -> dict:
-    await _send_verification_code_impl(payload.email)
-    return {"message": "A verification code has been sent to your email address."}
-
-
-async def signin(payload: SignInRequest, response: Response) -> TokenResponse:
-    tokens = await _signin_user_impl(payload.email, payload.code)
-
-    if tokens is None:
-        # Eski router'da yaptığımız kontrolü artık burada yapıyoruz
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired code.",
-        )
-
-    access_token, refresh_token = tokens
-    
-    # Refresh tokeni HttpOnly cookie olarak ayarla
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=False,  # HTTPS kullanınca True yapılacak
-        samesite="lax",  
-        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS,
-        path="/auth/refresh",  # sadece /auth/refresh isteklerinde gönderilsin
-    )
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token= refresh_token,
-    )
-
-
-async def refresh(request: Request, response: Response) -> TokenResponse:
-    
-    #refresh tokeni cookieden çek
-    refresh_token_cookie = request.cookies.get("refresh_token")
-    if not refresh_token_cookie:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token cookie not found",
-        )
-    
-    tokens = await _refresh_tokens_impl(refresh_token_cookie)
-
-    if tokens is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired refresh token",
-        )
-
-    new_access_token, new_refresh_token = tokens
-
-    # new_refresh_token i yeniden cookie olarak gönder (rotation)
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        httponly=True,
-        secure=False,  # PROD'da True
-        samesite="lax",
-        max_age=60 * 60 * 24 * REFRESH_TOKEN_EXPIRE_DAYS,
-        path="/auth/refresh",
-    )
-
-
-    return TokenResponse(
-        access_token=new_access_token,
-        refresh_token=new_refresh_token,
-    )
-
-
-# ========== PRIVATE İÇ İŞLEVLER (eski service'in gövdesi) ==========
-
-async def _send_verification_code_impl(email: str) -> None:
+async def send_code(payload: SendCodeRequest) -> SendCodeResponse:
     # 6 haneli kodu üret ve hashle
     raw_code = _generate_code()
     hashed = _hash_code(raw_code)
 
     expiry = _now_utc() + timedelta(minutes=CODE_TTL_MINUTES)
 
+    existing_code = await db.code.find_first(
+        where={
+            "email": payload.email,
+            "used": False,
+            "type": CodeType.VERIFICATION,
+            "expiry": {"gt": _now_utc()}
+        }
+    )
+
+    resend = existing_code is not None
+
+
     # Aynı email için kullanılmamış eski kodları "used=True" yap
     await db.code.update_many(
         where={
-            "email": email,
+            "email": payload.email,
             "used": False,
         },
         data={
@@ -132,36 +112,44 @@ async def _send_verification_code_impl(email: str) -> None:
         },
     )
 
-    # Aynı email ve type için eski kodları sil
+    # Aynı email ve type için kullanılmış eski kodları sil
     await db.code.delete_many(
         where={
-            "email": email,
+            "email": payload.email,
+            "used": True,
             "type": CodeType.VERIFICATION,
         }
     )
 
-    # Yeni kodu kaydet
+    # Yeni kodu oluştur ve kaydet
     await db.code.create(
         data={
-            "email": email,
+            "email": payload.email,
             "hashedCode": hashed,
             "type": CodeType.VERIFICATION,
             "expiry": expiry,
         }
     )
+
     # GERÇEK MAIL ENTEGRASYONU İÇİN YER
 
+
+
     # Debug için konsol
-    print(f"[DEBUG] Verification code for {email}: {raw_code} (expires at {expiry})")
+    print(f"[DEBUG] Verification code for {payload.email}: {raw_code} (expires at {expiry})")
+    
+    return SendCodeResponse(resend=resend, expiry=expiry)
 
 
-async def _signin_user_impl(email: str, code: str) -> tuple[str, str] | None:
+async def signin(payload: SignInRequest, response: Response) -> SignInResponse:
+    
     # Kod kaydını bul
     record = await db.code.find_first(
         where={
-            "email": email,
+            "email": payload.email,
+            "hashedCode": payload.code,
+            "used": False,
             "type": CodeType.VERIFICATION,
-            "used": False,  # kullanılmamış olsun
         },
         order={
             "createdAt": "desc",
@@ -169,21 +157,28 @@ async def _signin_user_impl(email: str, code: str) -> tuple[str, str] | None:
     )
 
     if record is None:
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired code",
+        )
 
     # Süresi dolmuş mu?
     if record.expiry < _now_utc():
         try:
+            #dolmamışsa
             await db.code.update(
                 where={"id": record.id},
                 data={"used": True},
             )
         except RecordNotFoundError:
             pass
-        return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired code",
+        )
 
     # Kod yanlışsa attempts + used ayarla
-    if record.hashedCode != _hash_code(code):
+    if record.hashedCode != _hash_code(payload.code):
         try:
             await db.code.update(
                 where={"id": record.id},
@@ -194,93 +189,176 @@ async def _signin_user_impl(email: str, code: str) -> tuple[str, str] | None:
             )
         except RecordNotFoundError:
             pass
-        return None
-
-    # Kod doğru ise tamamen sil
-    try:
-        await db.code.delete(
-            where={"id": record.id}
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired code",
         )
-    except RecordNotFoundError:
-        pass
+    else:
+        # Kod doğru ise tamamen sil
+        try:
+            await db.code.delete(
+                where={"id": record.id}
+            )
+        except RecordNotFoundError:
+            pass
 
     # email'i eşleşen kullanıcıyı bul / oluştur
-    user = await db.user.find_unique(
-        where={"email": email},
-    )
+    user = await db.user.find_unique(where={"email": payload.email},)
 
     if user is None:
         user = await db.user.create(
             data={
-                "email": email,
+                "email": payload.email,
                 "key": secrets.token_hex(32),
                 # "role": "STUDENT"  # default zaten
             }
         )
 
     # ACCESS TOKEN
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token_expires = timedelta(minutes=int(ACCESS_TOKEN_EXPIRE_MINUTES))
     access_token = create_access_token(
-        data={"sub": user.email},
+        data={"sub": str(user.id)},
         expires_delta=access_token_expires,
     )
 
     # REFRESH TOKEN
-    refresh_token = secrets.token_hex(64)
-    refresh_expires_at = _now_utc() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    session_id = _new_session_id()
+    session_expires_at = _now_utc + timedelta(days=int(REFRESH_TOKEN_EXPIRE_DAYS))
 
     await db.refreshtoken.create(
         data={
-            "token": refresh_token,
+            "token": session_id,
             "userId": user.id,
-            "expiresAt": refresh_expires_at,
+            "expiresAt": session_expires_at,
         }
     )
 
-    return access_token, refresh_token
+    return SignInResponse(role=user.role)
 
 
-async def _refresh_tokens_impl(old_refresh_token: str) -> tuple[str, str] | None:
-    now = _now_utc()
-
-    # 1. Refresh token kaydını bul
+async def refresh(request: Request, response: Response) -> RefreshResponse:
+    #session_id --> refresh token
+    session_id = request.cookies.get(SESSION_COOKIE_NAME)
+    if not session_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session cookie not found",
+        )
+    
     token_record = await db.refreshtoken.find_unique(
-        where={"token": old_refresh_token},
+        where={"token": session_id},
         include={"user": True},
     )
 
     if (
         token_record is None
         or token_record.revoked
-        or token_record.expiresAt < now
+        or token_record.expiresAt < _now_utc
+        or token_record.user is None
     ):
-        return None
-
+        _clear_cookie(response, ACCESS_COOKIE_NAME)
+        _clear_cookie(response, SESSION_COOKIE_NAME)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session",
+        )
+    
+    #db'deki refresh token'in içindeki user'ı al
     user = token_record.user
 
-    # 2. Eski refresh token'i iptal et
     await db.refreshtoken.update(
         where={"id": token_record.id},
         data={"revoked": True},
     )
 
-    # 3. Yeni access token
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    new_access_token = create_access_token(
-        data={"sub": user.email},
-        expires_delta=access_token_expires,
-    )
-
-    # 4. Yeni refresh token oluştur
-    new_refresh_token = secrets.token_hex(64)
-    refresh_expires_at = now + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    _new_session_id = _new_session_id()
+    new_session_expires_at = _now_utc() + timedelta(days=int(REFRESH_TOKEN_EXPIRE_DAYS))
 
     await db.refreshtoken.create(
         data={
-            "token": new_refresh_token,
+            "token": _new_session_id,
             "userId": user.id,
-            "expiresAt": refresh_expires_at,
+            "expiresAt": new_session_expires_at,
+        }
+    )
+    new_access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    _set_access_cookie(response, new_access_token)
+    _set_session_cookie(response, _new_session_id)
+
+    return RefreshResponse(ok=True)                                                
+
+
+async def reset_key(payload: ResetKeyRequest, response: Response) -> ResetKeyResponse:
+    
+    record = await db.code.find_first(
+        where={
+            "email": payload.email,
+            "hashedCode": payload.code,
+            "used": False,
+            "type": CodeType.RESET_KEY,
+            "expiry": {"gt": _now_utc()},
+        },
+        order={"createdAt": "desc"},
+    )
+
+    if record is None or record.expiry < _now_utc() or record.hashedCode != _hash_code(payload.code):
+        if record is not None:
+            try:
+                await db.code.update(where={"id": record.id}, data={"used": True})
+            except RecordNotFoundError:
+                pass
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired code",
+        )
+    
+    try:
+        await db.code.delete(where={"id": record.id})
+    except RecordNotFoundError:
+        pass
+
+    user = await db.user.find_unique(where={"email": payload.email})
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    
+    new_key = create_refresh_token({"sub": str(user.id)})
+
+    await db.user.update(
+        where={"id": user.id},
+        data={"key": new_key},
+    )
+
+    await db.refreshtoken.update_many(
+        where={"userId": user.id, "revoked": False},
+        data={"revoked": True},
+    )
+
+    session_id = _new_session_id()
+    session_expires_at = _now_utc() + timedelta(days=int(REFRESH_TOKEN_EXPIRE_DAYS))
+
+    await db.refreshtoken.create(
+        data={
+            "token": session_id,
+            "userId": user.id,
+            "expiresAt": session_expires_at,
         }
     )
 
-    return new_access_token, new_refresh_token
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    _set_access_cookie(response, access_token)
+    _set_session_cookie(response, session_id)
+
+    return ResetKeyResponse(ok=True)
+
