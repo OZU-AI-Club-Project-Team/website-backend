@@ -92,3 +92,21 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         )
 
     return user
+
+
+def require_roles(*roles: str):
+    """Return a dependency that requires the current user to have one of the given roles."""
+
+    async def _require(current_user=Depends(get_current_user)):
+        if getattr(current_user, "role", None) not in roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+        return current_user
+
+    return _require
+
+
+async def require_admin_or_self(id: int, current_user=Depends(get_current_user)):
+    """Dependency that allows access if current_user is admin or the same user as the path `id`."""
+    if current_user.id != id and getattr(current_user, "role", None) != "ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    return current_user

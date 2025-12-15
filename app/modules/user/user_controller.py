@@ -41,10 +41,6 @@ async def get_team_member_profile(user_id: int):
 
 
 async def update_user(user_id: int, data: dict, current_user) -> dict:
-    # allow user to update self or admins
-    if current_user.id != user_id and getattr(current_user, "role", None) != "ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-
     await db.user.update(where={"id": user_id}, data=data)
     updated = await db.user.find_unique(where={"id": user_id})
     return {

@@ -1,22 +1,19 @@
-from fastapi import FastAPI
 
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from app.db import db
 from app.routers.index import setup_app
 
-app = FastAPI(title="AI Website Backend", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await db.connect()
+    yield
+    await db.disconnect()
+
+app = FastAPI(title="AI Website Backend", version="1.0.0", lifespan=lifespan)
 
 # Bütün uygulamayı bu metot başlatıyor routers, headers, vs.
 setup_app(app)
-
-
-@app.on_event("startup")
-async def startup():
-    await db.connect()
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db.disconnect()
 
 
 @app.get("/")

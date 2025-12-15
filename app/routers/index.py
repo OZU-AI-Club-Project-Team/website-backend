@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 # Routerlar
 from app.modules.auth.auth_router import router as authRouter
 from app.modules.user.user_router import router as userRouter
+from app.modules.application import router as applicationRouter
 
 
 def setup_app(app: FastAPI) -> None:
@@ -84,3 +85,4 @@ def setup_app(app: FastAPI) -> None:
     # ========= ROUTERLAR =========
     app.include_router(authRouter)
     app.include_router(userRouter)
+    app.include_router(applicationRouter)
