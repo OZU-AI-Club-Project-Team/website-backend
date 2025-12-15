@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Request, Response, Body
 
 
 from app.modules.auth.auth_schema import (
@@ -6,7 +6,7 @@ from app.modules.auth.auth_schema import (
     SendCodeResponse,
     SignInRequest,
     SignInResponse,
-    #RefreshRequest,
+    RefreshRequest,
     RefreshResponse,
     ResetKeyRequest,
     ResetKeyResponse,
@@ -20,6 +20,7 @@ router = APIRouter(
     tags=["auth"],
 )
 
+
 @router.post("/send-code", response_model=SendCodeResponse)
 async def send_code(payload: SendCodeRequest):
     return await auth_controller.send_code(payload)
@@ -31,12 +32,14 @@ async def signin(payload: SignInRequest, response: Response):
 
 
 @router.post("/refresh", response_model=RefreshResponse)
-async def refresh(request: Request, response: Response):
-    return await auth_controller.refresh(request, Response)
+async def refresh(
+    payload: "RefreshRequest" = Body(None),
+    request: Request = None,
+    response: Response = None,
+):
+    return await auth_controller.refresh(payload, request, response)
+
 
 @router.post("/reset-key", response_model=ResetKeyResponse)
-async def reset_key(payload: ResetKeyRequest, request: Request, response: Response):
-    return await auth_controller.reset_key(payload, request, response)
-
-
-
+async def reset_key(payload: ResetKeyRequest, response: Response):
+    return await auth_controller.reset_key(payload, response)

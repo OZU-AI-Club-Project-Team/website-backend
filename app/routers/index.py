@@ -21,8 +21,7 @@ def setup_app(app: FastAPI) -> None:
         # - language / tenant vs. çıkarma
         # gibi işler konulacak
 
-
-        #Cookie'deki access_token bearer header'na çevrildi
+        # Cookie'deki access_token bearer header'na çevrildi
         access_token = request.cookies.get("access_token")
 
         if access_token:
@@ -36,7 +35,7 @@ def setup_app(app: FastAPI) -> None:
 
         response = await call_next(request)
 
-         # 1) Temel güvenlik header'ları
+        # 1) Temel güvenlik header'ları
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"  # clickjacking'e karşı
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -66,11 +65,11 @@ def setup_app(app: FastAPI) -> None:
         response.headers["Cross-Origin-Embedder-Policy"] = "require-corp"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
         """
-        
+
         # 5) Content Security Policy (CSP)
         # PROJEYE göre özelleştirilecek
-        
-        #response.headers["Content-Security-Policy"] = CSP_POLICY
+
+        # response.headers["Content-Security-Policy"] = CSP_POLICY
         return response
 
     # Buraya global exception handler da eklenebilir
