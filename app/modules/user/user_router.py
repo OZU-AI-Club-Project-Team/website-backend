@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from app.utils.security import get_current_user, require_admin_or_self  # noqa: F401 (exported for tests)
-from app.utils.security import require_roles
 from fastapi import Path, Body
 
 from app.modules.user import user_controller
