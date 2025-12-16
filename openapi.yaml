@@ -1,0 +1,1323 @@
+openapi: 3.0.3
+info:
+  title: OZU AI Project Team API
+  version: 0.1.0
+servers:
+  - url: https://api.ozuai.tech
+
+paths:
+  # ===================== PROJECTS =====================
+  /project:
+    get:
+      summary: Project list (showcase)
+      description: Lists showcase or all projects.
+      parameters:
+        - in: query
+          name: showcase
+          schema:
+            type: boolean
+          required: false
+          description: If true, returns only showcase projects.
+      responses:
+        '200':
+          description: Project list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int32
+                    title:
+                      type: string
+                    date:
+                      type: string
+                      format: date-time
+                    own:
+                      type: boolean
+                      description: Is the requesting user the leader/member of this project?
+                    public:
+                      type: boolean
+                    showcase:
+                      type: boolean
+                  required: [id, title, date, own, public, showcase]
+
+  /project/{id}:
+    get:
+      summary: Project detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int32
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/ProjectStatus'
+                  public:
+                    type: boolean
+                  showcase:
+                    type: boolean
+                  date:
+                    type: string
+                    format: date-time
+                  leader:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int32
+                      email:
+                        type: string
+                        format: email
+                      name:
+                        type: string
+                        nullable: true
+                      surname:
+                        type: string
+                        nullable: true
+                      teamMember:
+                        type: boolean
+                        description: Does the user have a teamMember profile?
+                    required: [id, email]
+                  members:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                        email:
+                          type: string
+                          format: email
+                        name:
+                          type: string
+                          nullable: true
+                        surname:
+                          type: string
+                          nullable: true
+                        roles:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/WorkRole'
+                        teamMember:
+                          type: boolean
+                      required: [id, email, roles]
+                  ideaId:
+                    type: integer
+                    format: int32
+                    nullable: true
+                required:
+                  - id
+                  - title
+                  - description
+                  - status
+                  - public
+                  - showcase
+                  - date
+                  - leader
+        '404':
+          description: Project not found
+
+  # ===================== IDEAS =====================
+  /idea:
+    get:
+      summary: Idea list
+      responses:
+        '200':
+          description: Idea list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int32
+                    title:
+                      type: string
+                    status:
+                      $ref: '#/components/schemas/IdeaStatus'
+                    date:
+                      type: string
+                      format: date-time
+                    own:
+                      type: boolean
+                      description: Is the requesting user the owner of this idea?
+                  required: [id, title, status, date, own]
+
+  /idea/{id}:
+    get:
+      summary: Idea detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Idea detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int32
+                  title:
+                    type: string
+                  description:
+                    type: string
+                  status:
+                    $ref: '#/components/schemas/IdeaStatus'
+                  owners:
+                    type: array
+                    description: Idea owners
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                        email:
+                          type: string
+                          format: email
+                        name:
+                          type: string
+                          nullable: true
+                        surname:
+                          type: string
+                          nullable: true
+                        teamMember:
+                          type: boolean
+                      required: [id, email]
+                  teamMembers:
+                    type: array
+                    description: Team members working on the idea
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                        email:
+                          type: string
+                          format: email
+                        name:
+                          type: string
+                          nullable: true
+                        surname:
+                          type: string
+                          nullable: true
+                        teamMember:
+                          type: boolean
+                      required: [id, email]
+                  presentations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                        date:
+                          type: string
+                          format: date-time
+                        done:
+                          type: boolean
+                      required: [id, date, done]
+                  applicationId:
+                    type: integer
+                    format: int32
+                    nullable: true
+                required:
+                  - id
+                  - title
+                  - description
+                  - status
+                  - owners
+        '404':
+          description: Idea not found
+
+  # ===================== APPLICATIONS =====================
+  /application:
+    get:
+      summary: Application list
+      responses:
+        '200':
+          description: Application list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int32
+                    email:
+                      type: string
+                      format: email
+                    type:
+                      $ref: '#/components/schemas/ApplicationType'
+                    status:
+                      $ref: '#/components/schemas/ApplicationStatus'
+                    isRead:
+                      type: boolean
+                    date:
+                      type: string
+                      format: date-time
+                    feedback:
+                      type: object
+                      nullable: true
+                      properties:
+                        content:
+                          type: string
+                        accepted:
+                          type: boolean
+                  required:
+                    - id
+                    - email
+                    - type
+                    - status
+                    - isRead
+                    - date
+
+  /application/{id}:
+    get:
+      summary: Application detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Application detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  owner:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int32
+                      email:
+                        type: string
+                        format: email
+                      name:
+                        type: string
+                        nullable: true
+                      surname:
+                        type: string
+                        nullable: true
+                      teamMember:
+                        type: boolean
+                    required: [id, email]
+                  type:
+                    $ref: '#/components/schemas/ApplicationType'
+                  status:
+                    $ref: '#/components/schemas/ApplicationStatus'
+                  isRead:
+                    type: boolean
+                  date:
+                    type: string
+                    format: date-time
+                  detail:
+                    type: object
+                    description: |
+                      For IDEA applications, title/description fields are populated.
+                      For TEAM_MEMBER applications, workAreas/bio/expectations/portfolioURL fields are populated.
+                    properties:
+                      title:
+                        type: string
+                        nullable: true
+                      description:
+                        type: string
+                        nullable: true
+                      workAreas:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/WorkArea'
+                      bio:
+                        type: string
+                        nullable: true
+                      expectations:
+                        type: string
+                        nullable: true
+                      portfolioURL:
+                        type: string
+                        nullable: true
+                  feedback:
+                    type: object
+                    nullable: true
+                    properties:
+                      content:
+                        type: string
+                      accepted:
+                        type: boolean
+                      user:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                            format: int32
+                          email:
+                            type: string
+                            format: email
+                          name:
+                            type: string
+                            nullable: true
+                          surname:
+                            type: string
+                            nullable: true
+                          teamMember:
+                            type: boolean
+                        required: [id, email]
+                      date:
+                        type: string
+                        format: date-time
+                required:
+                  - owner
+                  - type
+                  - status
+                  - isRead
+                  - date
+        '404':
+          description: Application not found
+
+  # ===================== PRESENTATIONS =====================
+  /presentation:
+    get:
+      summary: Presentation list
+      parameters:
+        - in: query
+          name: current
+          schema:
+            type: boolean
+          required: false
+          description: If true, returns only upcoming/current presentations (not yet done).
+      responses:
+        '200':
+          description: Presentation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int32
+                    title:
+                      type: string
+                    date:
+                      type: string
+                      format: date-time
+                    done:
+                      type: boolean
+                    own:
+                      type: boolean
+                      description: Is the requesting user in the presenting team?
+                  required: [id, title, date, done, own]
+
+  /presentation/{id}:
+    get:
+      summary: Presentation detail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Presentation detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  idea:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        format: int32
+                      title:
+                        type: string
+                    required: [id, title]
+                  title:
+                    type: string
+                  summary:
+                    type: string
+                  date:
+                    type: string
+                    format: date-time
+                  location:
+                    type: string
+                  done:
+                    type: boolean
+                  owners:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          format: int32
+                        email:
+                          type: string
+                          format: email
+                        name:
+                          type: string
+                          nullable: true
+                        surname:
+                          type: string
+                          nullable: true
+                        teamMember:
+                          type: boolean
+                      required: [id, email]
+                  feedbacks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        content:
+                          type: string
+                        user:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                              format: int32
+                            name:
+                              type: string
+                              nullable: true
+                            surname:
+                              type: string
+                              nullable: true
+                            teamMember:
+                              type: boolean
+                          required: [id]
+                        date:
+                          type: string
+                          format: date-time
+                required:
+                  - idea
+                  - title
+                  - summary
+                  - date
+                  - location
+                  - done
+        '404':
+          description: Presentation not found
+
+  # ===================== USERS =====================
+  /user/{id}:
+    get:
+      summary: User profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: User basic information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int32
+                  email:
+                    type: string
+                    format: email
+                  name:
+                    type: string
+                    nullable: true
+                  surname:
+                    type: string
+                    nullable: true
+                  studentNumber:
+                    type: string
+                    nullable: true
+                  teamMember:
+                    type: boolean
+                    description: Is there a TeamMember record?
+                required:
+                  - id
+                  - email
+        '404':
+          description: User not found
+
+  /user/{id}/team-member:
+    get:
+      summary: User's team member profile
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        '200':
+          description: Team member profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int32
+                  workAreas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkArea'
+                  photoURL:
+                    type: string
+                    nullable: true
+                  bio:
+                    type: string
+                  github:
+                    type: string
+                    nullable: true
+                  linkedin:
+                    type: string
+                    nullable: true
+                  extraLinks:
+                    type: array
+                    items:
+                      type: string
+                  applicationId:
+                    type: integer
+                    format: int32
+                    nullable: true
+                required:
+                  - id
+                  - workAreas
+                  - bio
+        '404':
+          description: Team member profile not found
+
+  # ===================== AUTH =====================
+  /auth/send-code:
+    post:
+      summary: Send verification code via email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+              required: [email]
+      responses:
+        '200':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  resend:
+                    type: boolean
+                    description: Was the code resent?
+                  expiry:
+                    type: string
+                    format: date-time
+                    description: Code expiration time
+                required: [resend, expiry]
+
+  /auth/signin:
+    post:
+      summary: Sign in with code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+              required: [email, code]
+      responses:
+        '200':
+          description: Sign in successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  role:
+                    $ref: '#/components/schemas/UserRole'
+                  accessToken:
+                    type: string
+                required: [role, accessToken]
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken:
+                  type: string
+              required: [refreshToken]
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                required: [accessToken]
+
+  /auth/reset-key:
+    post:
+      summary: Reset user key information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                code:
+                  type: string
+              required: [email, code]
+      responses:
+        '200':
+          description: Key successfully reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                required: [accessToken]
+components:
+  schemas:
+    # ========= Enums =========
+    UserRole:
+      type: string
+      enum:
+        - STUDENT
+        - MEMBER
+        - ADMIN
+
+    CodeType:
+      type: string
+      enum:
+        - VERIFICATION
+        - RESET_KEY
+
+    WorkArea:
+      type: string
+      enum:
+        - FRONTEND
+        - BACKEND
+        - DESIGN
+        - MOBILE
+        - MANAGEMENT
+
+    ApplicationStatus:
+      type: string
+      enum:
+        - PENDING
+        - CONTACTED
+        - ACCEPTED
+        - REJECTED
+
+    ApplicationType:
+      type: string
+      enum:
+        - IDEA
+        - TEAM_MEMBER
+
+    IdeaStatus:
+      type: string
+      enum:
+        - DRAFT
+        - PRESENTED
+        - ACCEPTED
+        - REJECTED
+
+    ProjectStatus:
+      type: string
+      enum:
+        - ONGOING
+        - COMPLETED
+        - ON_HOLD
+        - CANCELLED
+
+    WorkRole:
+      type: string
+      enum:
+        - BACKEND_DEVELOPER
+        - FRONTEND_DEVELOPER
+        - MOBILE_DEVELOPER
+        - DESIGNER
+        - PROJECT_MANAGER
+        - SUPERVISOR
+        - IDEATOR
+
+    # ========= Models =========
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        email:
+          type: string
+          format: email
+        role:
+          $ref: '#/components/schemas/UserRole'
+        key:
+          type: string
+        name:
+          type: string
+          nullable: true
+        surname:
+          type: string
+          nullable: true
+        studentNumber:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        teamMember:
+          $ref: '#/components/schemas/TeamMember'
+          nullable: true
+        applications:
+          type: array
+          items:
+            $ref: '#/components/schemas/Application'
+        ideas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Idea'
+        memberships:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectMember'
+        leadedProjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        givenApplicationFeedbacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApplicationFeedback'
+      required:
+        - id
+        - email
+        - role
+        - key
+        - createdAt
+        - updatedAt
+
+    Code:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        email:
+          type: string
+          format: email
+        hashedCode:
+          type: string
+        type:
+          $ref: '#/components/schemas/CodeType'
+        attempts:
+          type: integer
+          format: int32
+        expiry:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - email
+        - hashedCode
+        - type
+        - attempts
+        - expiry
+        - createdAt
+
+    TeamMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        workAreas:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkArea'
+        photoURL:
+          type: string
+          nullable: true
+        bio:
+          type: string
+        github:
+          type: string
+          nullable: true
+        linkedin:
+          type: string
+          nullable: true
+        extraLinks:
+          type: array
+          items:
+            type: string
+        applicationId:
+          type: integer
+          format: int32
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        user:
+          $ref: '#/components/schemas/User'
+        application:
+          $ref: '#/components/schemas/TeamMemberApplication'
+          nullable: true
+        givenPresentationFeedbacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdeaPresentationFeedback'
+      required:
+        - id
+        - workAreas
+        - bio
+        - extraLinks
+        - createdAt
+        - updatedAt
+        - user
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        ownerId:
+          type: integer
+          format: int32
+        type:
+          $ref: '#/components/schemas/ApplicationType'
+        status:
+          $ref: '#/components/schemas/ApplicationStatus'
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        owner:
+          $ref: '#/components/schemas/User'
+        feedback:
+          $ref: '#/components/schemas/ApplicationFeedback'
+          nullable: true
+        ideaApplication:
+          $ref: '#/components/schemas/IdeaApplication'
+          nullable: true
+        teamMemberApplication:
+          $ref: '#/components/schemas/TeamMemberApplication'
+          nullable: true
+      required:
+        - id
+        - ownerId
+        - type
+        - status
+        - isRead
+        - createdAt
+        - updatedAt
+        - owner
+
+    ApplicationFeedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        applicationId:
+          type: integer
+          format: int32
+        content:
+          type: string
+        accepted:
+          type: boolean
+        userId:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        # Relations
+        user:
+          $ref: '#/components/schemas/User'
+        application:
+          $ref: '#/components/schemas/Application'
+      required:
+        - id
+        - applicationId
+        - content
+        - accepted
+        - userId
+        - createdAt
+        - user
+        - application
+
+    IdeaApplication:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        title:
+          type: string
+        description:
+          type: string
+        # Relations
+        idea:
+          $ref: '#/components/schemas/Idea'
+          nullable: true
+        application:
+          $ref: '#/components/schemas/Application'
+      required:
+        - id
+        - title
+        - description
+        - application
+
+    TeamMemberApplication:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        workAreas:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkArea'
+        bio:
+          type: string
+        expectations:
+          type: string
+        portfolioURL:
+          type: string
+          nullable: true
+        # Relations
+        teamMember:
+          $ref: '#/components/schemas/TeamMember'
+          nullable: true
+        application:
+          $ref: '#/components/schemas/Application'
+      required:
+        - id
+        - workAreas
+        - bio
+        - expectations
+        - application
+
+    Idea:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        applicationId:
+          type: integer
+          format: int32
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/IdeaStatus'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        owners:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        application:
+          $ref: '#/components/schemas/IdeaApplication'
+          nullable: true
+        presentations:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdeaPresentation'
+        project:
+          $ref: '#/components/schemas/Project'
+          nullable: true
+      required:
+        - id
+        - title
+        - description
+        - status
+        - createdAt
+        - updatedAt
+        - owners
+
+    IdeaPresentation:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        ideaId:
+          type: integer
+          format: int32
+        date:
+          type: string
+          format: date-time
+        location:
+          type: string
+        summary:
+          type: string
+        done:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        idea:
+          $ref: '#/components/schemas/Idea'
+        feedbacks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IdeaPresentationFeedback'
+      required:
+        - id
+        - ideaId
+        - date
+        - location
+        - summary
+        - done
+        - createdAt
+        - idea
+
+    IdeaPresentationFeedback:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        presentationId:
+          type: integer
+          format: int32
+        userId:
+          type: integer
+          format: int32
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        presentation:
+          $ref: '#/components/schemas/IdeaPresentation'
+        user:
+          $ref: '#/components/schemas/TeamMember'
+      required:
+        - id
+        - presentationId
+        - userId
+        - content
+        - createdAt
+        - presentation
+        - user
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        ideaId:
+          type: integer
+          format: int32
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        public:
+          type: boolean
+        showcase:
+          type: boolean
+        leaderId:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        # Relations
+        leader:
+          $ref: '#/components/schemas/User'
+        idea:
+          $ref: '#/components/schemas/Idea'
+          nullable: true
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectMember'
+      required:
+        - id
+        - title
+        - description
+        - status
+        - public
+        - showcase
+        - leaderId
+        - createdAt
+        - updatedAt
+        - leader
+
+    ProjectMember:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int32
+        projectId:
+          type: integer
+          format: int32
+        userId:
+          type: integer
+          format: int32
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkRole'
+        joinedAt:
+          type: string
+          format: date-time
+        # Relations
+        project:
+          $ref: '#/components/schemas/Project'
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - id
+        - projectId
+        - userId
+        - roles
+        - joinedAt
+        - project
+        - user

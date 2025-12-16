@@ -14,10 +14,11 @@ router = APIRouter(
 
 
 # Admin-only static route should be defined before dynamic `/{id}` routes
-@router.get("/admin-only")
-async def admin_only(current_user=Depends(require_roles("ADMIN"))):
-    """Example admin-only endpoint for testing role-based dependency."""
-    return {"ok": True}
+#@router.get("/admin-only")
+#async def admin_only(current_user=Depends(require_roles("ADMIN"))):
+#        """Example admin-only endpoint for testing role-based dependency."""
+#    return {"ok": True}
+
 
 @router.get("/{id}", response_model=User)
 async def get_user(id: int = Path(..., ge=1)):
