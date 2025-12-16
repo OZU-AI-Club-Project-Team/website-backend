@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends
 
 from app.utils.security import get_current_user, require_admin_or_self  # noqa: F401 (exported for tests)
-from app.utils.security import require_roles
 from fastapi import Path, Body
 
 from app.modules.user import user_controller
@@ -14,10 +13,11 @@ router = APIRouter(
 
 
 # Admin-only static route should be defined before dynamic `/{id}` routes
-@router.get("/admin-only")
-async def admin_only(current_user=Depends(require_roles("ADMIN"))):
-    """Example admin-only endpoint for testing role-based dependency."""
-    return {"ok": True}
+#@router.get("/admin-only")
+#async def admin_only(current_user=Depends(require_roles("ADMIN"))):
+#        """Example admin-only endpoint for testing role-based dependency."""
+#    return {"ok": True}
+
 
 @router.get("/{id}", response_model=User)
 async def get_user(id: int = Path(..., ge=1)):

@@ -4,10 +4,10 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root))
 
-from types import SimpleNamespace
-from fastapi.testclient import TestClient
-from app.main import app
-from app.modules.user.user_router import get_current_user
+from types import SimpleNamespace  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from app.main import app  # noqa: E402
+from app.modules.user.user_router import get_current_user  # noqa: E402
 
 client = TestClient(app)
 
