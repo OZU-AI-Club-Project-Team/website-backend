@@ -5,6 +5,9 @@ from fastapi.responses import JSONResponse
 from app.modules.auth.auth_router import router as authRouter
 from app.modules.user.user_router import router as userRouter
 from app.modules.application import router as applicationRouter
+from app.modules.project import router as projectRouter
+from app.modules.idea import router as ideaRouter
+from app.modules.presentation import router as presentationRouter
 
 
 def setup_app(app: FastAPI) -> None:
@@ -86,3 +89,6 @@ def setup_app(app: FastAPI) -> None:
     app.include_router(authRouter)
     app.include_router(userRouter)
     app.include_router(applicationRouter)
+    app.include_router(projectRouter)
+    app.include_router(ideaRouter)
+    app.include_router(presentationRouter)
